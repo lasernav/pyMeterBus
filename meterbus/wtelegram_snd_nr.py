@@ -12,7 +12,7 @@ class WTelegramSndNr(WTelegramFrame):
     @staticmethod
     def parse(data):
         try:
-            if data[1] != 0x44:  # SND-NR
+            if data[1] != 0x44 and data[1] != 0x46:  # SND-NR
                 raise FrameMismatch()
         except IndexError:
             raise FrameMismatch()

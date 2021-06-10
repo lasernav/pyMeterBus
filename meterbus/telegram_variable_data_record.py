@@ -79,7 +79,11 @@ class TelegramVariableDataRecord(object):
         else:
             code = (vif & self.UNIT_MULTIPLIER_MASK)
 
-        return VIFTable.lut[code]
+        try:
+            return VIFTable.lut[code]
+        except Exception as e:
+            pass
+        return 1.0, MeasureUnit.NONE, VIFUnit.ANY_VIF
 
     @property
     def unit(self):
