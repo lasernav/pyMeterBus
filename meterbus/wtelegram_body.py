@@ -12,6 +12,8 @@ from .telegram_field import TelegramField
 from .value_information_block import ValueInformationBlock
 from .telegram_body import TelegramBodyPayload
 
+from .decrypt_utils import get_module_keys
+
 
 class WTelegramBaseDataHeader(object):
     BYTE_ORDER_MASK = 0x04    # 0000 0100
@@ -246,30 +248,28 @@ class WTelegramBaseDataHeader(object):
         return None
 
     def decrypt(self, data):
-        # FIXME: implement proper handling of KEYS
-        keys = {
-            '\x00\x00\x03\x11': b'\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F',
-            "\x19\x70\x30\x77": b"\xf7\x2b\x76\xc3\x27\x73\x9f\x90\x13\x4e\x86\x19\xe6\xf7\x31\x59",  # ;a9fd3e15b70018e4fb9f7dc3dfb659bf;67df58b94b5b056567844ee9e2766344;e03f38138636f4ec287de0bb9f46769a;e1e90e7120e7c9dcac5d82d19ad95fbb;f553de8842b47f0e314a1a0d0b31312b;1464f2b22b2bc11c2eff14107ef63065;b135e7c78b4a5cc762622ad65e529d19;e170aa1ba6f9ac1549134f968e46603c;b588d67f1b6ea3ac5bf3a95edbee628b;ad313ebb7b81ec43f4ade3b2d3808d4b;b9d158d1c9b799923d44409ef4d2d00a;3de5e27489968f004cda2295d01212d9;8ce2a9c6d5636427b967c10e75144b87;e1a2c120b870446190c83ddfb4f0dee2;78352a9828fb0412cf118a4561f6320b
-            "\x19\x76\x26\x10": b"\xbc\xae\x7f\xa8\xf0\x9c\xe6\x15\x70\xde\x9e\xbd\x20\x45\x84\x1a"   # ;42beb5395ad0770149d83e9a9e791053;1cddb1f3a1c30532f12ed38e53eca466;c25b9d75540cdc8cad68da05cec6dcac;24faabfdf014101b418e80bd8379f600;86987caf4501e3c0baebba9f5be88eab;5721dd20035cdf7205a694829009065b;6dab726db4e471062b43e0ef8d87d41d;cb71a59855180c2e009cbb054871310d;231c0d1636e670bc83a0ff46ba9b19cb;9a74c786df27d624f1dc9bacd0bfb09f;4293f5f88c266638a503b01fb830864b;e74d73753266ceffb05a9858fe5df637;9d3d08fd721b51e9f8e8ac03d626457d;f883d9a32c44709a5d7c40bc90ba6eb2;52b32bc78a5c229c41c3b25a32e1cace
-        }
-
-        devid = ''.join(chr(b) for b in self.id_nr_field[::-1])
-        key = keys.get(devid, None)
-
-        if key is None:
-            return False
-
         if self.encryption_mode == 5:
             orig_len = len(data)
+            module_key, network_key = get_module_keys(self.manufacturer_field.decodeManufacturer, self.id_nr_field.decodeBCD)
+            if module_key is None:
+                raise Exception("Decryption failed: module key not found")
+                # return False
 
-            spec = AES.new(key, AES.MODE_CBC, bytes(self.crypto_iv))
+            spec = AES.new(module_key, AES.MODE_CBC, bytes(self.crypto_iv))
             data = data + ((16 - orig_len % 16) * [self.PADDING_BYTE])
             data = [int(x) for x in bytearray(spec.decrypt(bytes(data)))]
 
             if data[0:2] != [0x2F, 0x2F]:
+                # raise Exception("Decryption failed: AES verification mismatch")
+                print("Decryption failed: AES verification mismatch")
                 return False
-            #     raise Exception("Decryption failed")
             return data[:orig_len]
+        else:
+            iv = self.crypto_iv(data)
+            module_key, network_key = get_module_keys(self.manufacturer_field.decodeManufacturer,
+                                                      self.id_nr_field.decodeBCD)
+            if module_key is None:
+                return False
 
         return None
 
@@ -447,6 +447,10 @@ class WTelegramFrame(object):
     @property
     def records(self):
         return self._payload.records
+
+    @property
+    def decodedPayload(self):
+        return self._payload.body.parts
 
 #    @records.setter
 #    def records(self, val):
