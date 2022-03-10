@@ -265,7 +265,7 @@ class WTelegramBaseDataHeader(object):
                 return False
             return data[:orig_len]
         else:
-            iv = self.crypto_iv(data)
+            iv = self.crypto_iv
             module_key, network_key = get_module_keys(self.manufacturer_field.decodeManufacturer,
                                                       self.id_nr_field.decodeBCD)
             if module_key is None:
