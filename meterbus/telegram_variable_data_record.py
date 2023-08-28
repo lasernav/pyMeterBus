@@ -93,11 +93,6 @@ class TelegramVariableDataRecord(object):
         return unit
 
     @property
-    def datatype(self):
-        _, _, typ = self._parse_vifx()
-        return typ
-
-    @property
     def value(self):
         value = self.parsed_value
         if type(value) == str and all(ord(c) < 128 for c in value):
